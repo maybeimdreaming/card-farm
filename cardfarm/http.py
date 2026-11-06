@@ -3,6 +3,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 import urllib.parse
 
 QUIET = {"creationflags": 0x08000000} if sys.platform == "win32" else {}  # no console window flashing up
@@ -12,9 +14,51 @@ UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 class HttpError(Exception):
     def __init__(self, status, body="", url=""):
         where = f" from {urllib.parse.urlsplit(url).path}" if url else ""
-        super().__init__("Steam says too many requests (HTTP 429); waiting before trying again"
-                         if status == 429 else f"HTTP {status}{where}")
+        if status == 429:
+            text = "Steam says too many requests (HTTP 429); waiting before trying again"
+        elif status == 0:
+            text = "couldn't reach Steam (no connection, or it took too long); trying again soon"
+        elif status in (401, 403):
+            text = f"Steam turned the request away as signed out (HTTP {status}); if it keeps happening, sign in again"
+        elif status >= 500:
+            text = f"Steam's servers are having trouble (HTTP {status}); trying again soon"
+        else:
+            text = f"HTTP {status}{where}"
+        super().__init__(text)
         self.status, self.body, self.url = status, body, url
+
+
+# After Steam says "too many requests", every request to that Steam site (the community, the store,
+# the Web API: each has its own limit) is turned away here for a while, 5 minutes, then 10, up to 30,
+# instead of each part of the app asking again and keeping the limit tripped.
+PAUSING = ("steamcommunity.com", "store.steampowered.com", "api.steampowered.com")
+_pause, _pause_lock = {}, threading.Lock()  # host -> {"until": when, "minutes": the last pause}
+on_pause = None  # called with (host, minutes) when a pause starts, to tell the page
+
+
+def paused_until(url):
+    host = urllib.parse.urlsplit(url).hostname
+    with _pause_lock:
+        until = _pause.get(host, {}).get("until", 0)
+    return until if until > time.time() else 0
+
+
+def _note(url, status):
+    host = urllib.parse.urlsplit(url).hostname
+    if host not in PAUSING:
+        return
+    with _pause_lock:
+        p = _pause.setdefault(host, {"until": 0, "minutes": 0})
+        if status == 429:
+            p["minutes"] = min(p["minutes"] * 2 or 5, 30)
+            p["until"] = time.time() + p["minutes"] * 60
+            minutes = p["minutes"]
+        else:
+            if status == 200:
+                p["minutes"] = 0
+            return
+    if on_pause:
+        on_pause(host, minutes)
 
 
 def _quoted(text):
@@ -25,7 +69,10 @@ def request(url, data=None, cookies=None, headers=None, timeout=30):
     """Returns (status, body text). data (a dict) makes it a form POST.
 
     Cookies, headers and the form go to curl as a config on stdin, never on its command line,
-    which any program on the PC can read."""
+    which any program on the PC can read. While Steam has asked that site to slow down, this
+    answers 429 itself without asking."""
+    if paused_until(url):
+        return 429, ""
     config = [f"url = {_quoted(url)}"]
     if cookies:
         config.append(f"cookie = {_quoted('; '.join(f'{k}={v}' for k, v in cookies.items()))}")
@@ -38,6 +85,7 @@ def request(url, data=None, cookies=None, headers=None, timeout=30):
     out = subprocess.run(cmd, input="\n".join(config).encode() + b"\n",
                          capture_output=True, timeout=timeout + 10, **QUIET).stdout.decode("utf-8", "replace")
     body, _, status = out.rpartition("\n")
+    _note(url, int(status or 0))
     return int(status or 0), body
 
 

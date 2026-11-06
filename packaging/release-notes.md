@@ -3,6 +3,9 @@ Card Farmer's Market farms your Steam trading card drops, then sells each card o
 **New in 0.4:**
 - **A garden:** a new look, with the tabs on a strip of grass over rocky ground, and a flower in the grass for every card you farm (foil cards grow a shimmering one). Themes: Light, Dark, Pink, or Auto to follow your system.
 - Friendlier wording throughout, shorter explanations, and "Activity" instead of "Tape".
+- **Clearer problems:** when a game won't start, it says why (Steam not signed in, the game not owned, Steam's library broken); connection and Steam server troubles read in plain words.
+- **"Too many requests" pauses everything on that Steam site,** not just market prices, so the limit isn't kept tripped from another corner.
+- **The garden starts full:** it counts every card drop your badges page shows, so it isn't bare after an update.
 - **Stays signed in.** The sign-in now renews itself the way the Steam website does. Before, it stopped working about a day after signing in: drops weren't seen anymore and the games list went stale (games looked like they still had drops).
 - **Start / Stop farming** at the top of the window.
 - **Playtime first, then one game at a time:** games with less than 2 hours of playtime idle together (up to 32) until they reach it, since most games don't drop cards before that; then games idle one at a time, in your "Farm first" order, which is how Steam drops cards fastest. The "Games at once" setting is gone.

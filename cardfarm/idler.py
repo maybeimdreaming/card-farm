@@ -217,11 +217,15 @@ class Idler:
                 del self.procs[appid]
         return set(self.procs)
 
+    # why an idler stopped right away, by its exit code (see child)
+    WHY = {2: "Steam's API library wouldn't load; it's looked for again next time",
+           3: "Steam turned it down: is the Steam app running and signed in to this account, and does it own the game?"}
+
     def start(self, appids):
-        """Start these games together; returns the ones Steam wouldn't take."""
+        """Start these games together; returns {appid: why} for the ones that didn't stay running."""
         appids = [a for a in appids if a not in self.running()]
         if not appids:
-            return set()
+            return {}
         self.library = self.library or find_library(self.data_dir)
         started = {}
         for appid in appids:
@@ -229,12 +233,18 @@ class Idler:
             started[appid] = subprocess.Popen(child_command(self.library), env=env, stdin=subprocess.PIPE,
                                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **QUIET)
         time.sleep(3)  # SteamAPI_Init fails within a moment when Steam says no
-        failed = set()
+        failed = {}
         for appid, p in started.items():
             if p.poll() is None:
                 self.procs[appid] = p
             else:
-                failed.add(appid)
+                failed[appid] = self.WHY.get(p.returncode, f"its idler stopped at once (exit code {p.returncode})")
+        if any(p.returncode == 2 for p in started.values() if p.poll() is not None):
+            self.library = None  # a broken copy: find (and copy) a good one next time
+            try:
+                os.remove(os.path.join(self.data_dir, LIBRARY))
+            except OSError:
+                pass
         return failed
 
     def stop(self, appid):

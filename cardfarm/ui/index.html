@@ -668,8 +668,10 @@ function flower(i, x, foil, isNew) {
     + `<ellipse cx="${f(leafX)}" cy="${f(leafY)}" rx="2.2" ry="1" fill="#4f8f2c" transform="rotate(-30 ${f(leafX)} ${f(leafY)})"/>`
     + `<g class="petals">${petals}</g><circle cx="${f(hx)}" cy="${f(hy)}" r="${f(1.6 * size)}" fill="${heart}"/>${spark}</svg>`;
 }
-function renderFlowers(stats) {
-  const box = $("#flowers"), n = stats.drops, foils = new Set(stats.foil_drops || []);
+function renderFlowers(stats, garden) {
+  // foil drops are numbered among the drops counted here; older ones from the badges page come first
+  const box = $("#flowers"), n = Math.max(garden || 0, stats.drops), shift = n - stats.drops;
+  const foils = new Set((stats.foil_drops || []).map(i => i + shift));
   const slots = Math.max(8, Math.floor(box.clientWidth / 15));
   if (!box.clientWidth || flowersFor === `${n}/${slots}/${foils.size}`) return;
   const grown = flowersFor ? +flowersFor.split("/")[0] : n;
@@ -683,7 +685,7 @@ function renderFlowers(stats) {
   box.innerHTML = html;
   box.title = n ? `${n} card${n === 1 ? "" : "s"} farmed` + (foils.size ? `, ${foils.size} of them foil` : "") + ": a flower for each" : "";
 }
-addEventListener("resize", () => state && renderFlowers(state.stats));
+addEventListener("resize", () => state && renderFlowers(state.stats, state.garden));
 
 // the theme: the system's light or dark unless one is picked
 let themeShown = null;
@@ -979,7 +981,7 @@ function render(s) {
   }
   renderTabs();
   applyTheme(s.settings.theme);
-  renderFlowers(s.stats);
+  renderFlowers(s.stats, s.garden);
   const farming = s.idling.length > 0, on = s.settings.farming;
   $("#ticker").classList.toggle("paused", !farming);
   $("#ticker-label b").textContent = s.status === "starting" ? "Starting…" : s.status;

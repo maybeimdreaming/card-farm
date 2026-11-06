@@ -654,19 +654,31 @@ def test_level_up_queues_the_plan_and_keeps_the_cards(world, monkeypatch):
     assert not f.finishing(7) and log.count(("craft", 7)) == 2
 
 
-def test_after_a_429_market_lookups_pause_together(tmp_path, monkeypatch):
-    calls = []
+def test_after_a_429_requests_to_that_steam_site_pause_together(tmp_path, monkeypatch):
+    from cardfarm import http
+    sent, said = [], []
 
-    def limited(url):
-        calls.append(url)
-        raise steam.HttpError(429)
-    monkeypatch.setattr(steam, "get_json", limited)
+    class Done:
+        stdout = b"\n429"
+
+    def curl(cmd, input, **kw):
+        sent.append(input.decode().splitlines()[0])
+        return Done()
+    monkeypatch.setattr(http.subprocess, "run", curl)
+    monkeypatch.setattr(http, "_pause", {})
+    monkeypatch.setattr(http, "on_pause", lambda host, minutes: said.append((host, minutes)))
     monkeypatch.setattr(steam.time, "sleep", lambda x: None)
     p = steam.Prices(str(tmp_path / "prices.json"))
     for appid in (1, 2, 3):
         with pytest.raises(steam.HttpError):
             p.item_stats(753, f"{appid}-Pack")
-    assert len(calls) == 1 and p._backoff == 5      # only the first one reached Steam
+    assert len(sent) == 1 and said == [("steamcommunity.com", 5)]  # only the first reached Steam
+    assert http.request("https://steamcommunity.com/profiles/1/badges/")[0] == 429 and len(sent) == 1  # the badges wait too
+    http.request("https://store.steampowered.com/api/appdetails?appids=1")  # another site has its own limit
+    assert len(sent) == 2 and said[-1] == ("store.steampowered.com", 5)
+    http._pause["steamcommunity.com"]["until"] = 0  # the pause is over; Steam still says no: a longer one
+    http.request("https://steamcommunity.com/market/")
+    assert said[-1] == ("steamcommunity.com", 10)
 
 
 def test_recent_sales_from_price_history():
@@ -950,3 +962,35 @@ def test_foil_drops_are_remembered_for_the_garden(world):
 def test_the_theme_is_a_setting():
     assert rules.DEFAULTS["theme"] == "auto"
     assert rules.clean({"theme": "pink"}) == {"theme": "pink"} and rules.clean({"theme": "neon"}) == {}
+
+
+def test_an_idler_that_stops_at_once_says_why(tmp_path, monkeypatch):
+    class Proc:
+        def __init__(self, code):
+            self.returncode = code
+        def poll(self):
+            return self.returncode
+    codes = iter([3, None, 7])
+    monkeypatch.setattr(idler.subprocess, "Popen", lambda *a, **kw: Proc(next(codes)))
+    monkeypatch.setattr(idler.time, "sleep", lambda s: None)
+    i = idler.Idler(str(tmp_path))
+    i.library = "lib"
+    failed = i.start([10, 11, 12])
+    assert set(failed) == {10, 12} and "signed in" in failed[10] and "exit code 7" in failed[12]
+    assert set(i.procs) == {11}
+
+
+def test_steam_errors_read_plainly():
+    assert "couldn't reach Steam" in str(steam.HttpError(0))
+    assert "servers are having trouble" in str(steam.HttpError(502))
+    assert "sign in again" in str(steam.HttpError(403))
+
+
+def test_the_garden_counts_drops_from_the_badges_page_too(world):
+    f = world["make"]()
+    f.state["games"] = [{"appid": 10, "name": "A", "drops": 1, "earned": 4}, {"appid": 11, "name": "B", "drops": 0, "earned": 3}]
+    f.state["stats"]["drops"] = 2
+    snap = f.snapshot()
+    assert snap["garden"] == 6 and snap["stats"]["drops"] == 2  # "Cards farmed" stays what was farmed here
+    f.state["stats"]["drops"] = 9
+    assert f.snapshot()["garden"] == 9

@@ -8,7 +8,7 @@ import threading
 import time
 import traceback
 
-from . import market, qr, rules, steam, update
+from . import http, market, qr, rules, steam, update
 from .auth import Session
 from .idler import Idler, game_you_are_playing, steam_pid
 
@@ -82,11 +82,15 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
         self._qr_svg = (None, None)
         self._wake = threading.Event()
         self._jobs = threading.Event()
-        steam.on_wait = self._slowed_down
+        http.on_pause = self._slowed_down
 
-    def _slowed_down(self, minutes=1):
+    SITES = {"steamcommunity.com": "the Steam Community and market", "store.steampowered.com": "the Steam store",
+             "api.steampowered.com": "Steam's Web API"}
+
+    def _slowed_down(self, host, minutes):
+        """Steam said too many requests: everything on that site waits (see http.PAUSING)."""
         self._starting(f"Steam asked to slow down; waiting {minutes} min…")
-        self.log(f"Steam said too many requests; market lookups wait {minutes} min", "warn")
+        self.log(f"Steam said too many requests; requests to {self.SITES.get(host, host)} wait {minutes} min", "warn")
 
     def _path(self, name):
         return os.path.join(self.data, name)
@@ -378,7 +382,7 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
             idling = self.state["idling"]  # keyed by str(appid), like everything saved as JSON
             for appid in want:
                 if appid in failed:
-                    self.log(f"Steam wouldn't start {self._name(appid)}; skipping it for now", "warn")
+                    self.log(f"Couldn't start {self._name(appid)}: {failed[appid]}. Skipping it for now", "warn")
                     self.state["skipped"][str(appid)] = now + SKIP_FOR
                     idling.pop(str(appid), None)
                     continue
@@ -792,6 +796,9 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
                           for g in self._candidates(with_skipped=True)] if self.session.signed_in else [],
                 "kept_games": [{"appid": a, "name": names.get(a, str(a))} for a in sorted(keep)],
                 "drops_left": sum(g["drops"] for g in st["games"]),
+                # the garden's flowers: every card drop the badges page shows (so a garden doesn't start
+                # bare after an update or a reinstall), or the drops counted here when that's more
+                "garden": max(st["stats"]["drops"], sum(max(0, g["earned"] - g["drops"]) for g in st["games"])),
                 "review": st["review"], "history": st["history"][:80], "stats": st["stats"],
                 "items": {"inventories": [dict(i, on=i["key"] in self.settings["items_inventories"])
                                           for i in st["items"]["inventories"]],

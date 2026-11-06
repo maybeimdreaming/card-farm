@@ -9,7 +9,9 @@ import threading
 import time
 import urllib.parse
 
+from . import http
 from .http import HttpError, get_json, post_json, request
+from .http import paused_until as http_paused_until
 
 COMMUNITY = "https://steamcommunity.com"
 CARDS = (753, 6)  # the Steam inventory's Community context, where cards live
@@ -172,7 +174,6 @@ class Prices:
         self.path = path
         self.lock = threading.RLock()
         self._last = 0.0
-        self._resume, self._backoff = 0.0, 0  # market pause after a 429: until when, and how long it was
         self.session = None  # the farm's sign-in, set by the farm
         try:
             self.cache = json.load(open(path))
@@ -187,23 +188,13 @@ class Prices:
 
     def _ask(self, url):
         """One market request, at least GAP seconds after the previous one (callers hold the lock).
-        After Steam says "too many requests", every market request is turned away here for a while
-        (5 minutes, then 10, up to 30) instead of each one asking again."""
-        if time.time() < self._resume:
+        After "too many requests" the http layer turns requests away for a while (see http.PAUSING)."""
+        if http_paused_until(url):
             raise HttpError(429, "", url)
         time.sleep(max(0.0, self._last + self.GAP - time.time()))
         signed = self.session and self.session.signed_in  # signed in, Steam lets the market be asked far more
         try:
-            d = _patient(lambda: get_json(url, cookies=self.session.cookies()) if signed else get_json(url), tries=1)
-            self._backoff = 0
-            return d
-        except HttpError as e:
-            if e.status == 429:
-                self._backoff = min(self._backoff * 2 or 5, 30)
-                self._resume = time.time() + self._backoff * 60
-                if on_wait:
-                    on_wait(self._backoff)
-            raise
+            return _patient(lambda: get_json(url, cookies=self.session.cookies()) if signed else get_json(url), tries=1)
         finally:
             self._last = time.time()
 
@@ -305,12 +296,11 @@ def _cents(text):
     return round(float(text.strip("$ ").replace(",", "")) * 100) if text else None
 
 
-on_wait = None  # called with the minutes about to be spent waiting out a 429, to tell the page
 
 
 def _patient(call, tries=6):
-    """Wait out "too many requests" (a minute at a time, `tries` in all) and Steam's passing server
-    errors (a few seconds, three tries)."""
+    """Wait out "too many requests" (a minute at a time, `tries` in all; the http layer says when the
+    pause starts) and Steam's passing server errors (a few seconds, three tries)."""
     hiccups = waits = 0
     while True:
         try:
@@ -323,8 +313,6 @@ def _patient(call, tries=6):
             if e.status != 429 or waits >= tries - 1:
                 raise
             waits += 1
-            if on_wait:
-                on_wait(1)
             time.sleep(60)
 
 
