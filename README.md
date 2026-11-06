@@ -66,10 +66,25 @@ Get the latest version from the [Releases page](https://github.com/maybeimdreami
 
 Steam must be running and signed in, and you need the Steam mobile app with Steam Guard for the sign-in and for confirming market listings. Card Farmer's Market finds Steam's own API library (`steam_api64.dll`, `libsteam_api.dylib` or `libsteam_api.so`) in any game you have installed and doesn't ship a copy; on Linux, any Proton version has one.
 
+### Farm service and remote browser access
+
+The desktop app starts the farm service automatically when needed and connects its existing interface to it. Minimising the desktop window puts it in the system tray; choose **Open Card Farmer's Market** there to bring it back. **Quit frontend** closes only the window, while **Stop service** in the interface stops farming and the service. The app can reconnect when opened again.
+
+You can also run the service separately, for example under systemd or another process manager:
+
+```sh
+card-farm --service
+```
+
+For a terminal dashboard and controls, run `card-farm --tui`. It starts or connects to the same service and provides Overview, Cards, and Activity pages. Use `1`–`3` to switch pages, `f` to toggle farming, `j`/`k` to select cards, `s`/`g`/`h` to sell, gem, or keep a selected card, `o` to open the web interface, and `q` to exit the TUI. Press `Q` and confirm with `y` to stop the service.
+
+It serves the same interface and API at `http://127.0.0.1:8765` by default. Set `CARD_FARM_HOST` and `CARD_FARM_PORT`, or pass `--host` and `--port`, to choose another bind address. The desktop frontend connects to `CARD_FARM_URL` when set; otherwise it starts/uses the default local service. Binding beyond localhost exposes a powerful, unauthenticated interface. Put authentication and TLS in a reverse proxy or restrict access to a trusted VPN/private network.
+
 ### Linux requirements
 
 - Python 3.10 or newer, and `curl`
 - GTK 4, libadwaita and WebKitGTK 6 with their Python bindings (PyGObject). Most GNOME and KDE desktops have these already.
+- A system tray host; the pipx install includes the Python tray library. Users of the standalone `.pyz` also need `pystray` and Pillow installed for its system Python.
 
 ### Install on Linux with pipx
 
@@ -78,15 +93,15 @@ pipx install git+https://github.com/maybeimdreaming/card-farmers-market
 card-farm
 ```
 
-`card-farm` opens the window. To add it to your app menu:
+`card-farm` opens the window and installs the tray icon dependency. To add it to your app menu:
 
 ```sh
 curl -o ~/.local/share/applications/io.github.cardfarm.CardFarm.desktop \
   https://raw.githubusercontent.com/maybeimdreaming/card-farmers-market/main/extras/io.github.cardfarm.CardFarm.desktop
 ```
 
-Closing the window while farming keeps Card Farmer's Market running in the background; open it again from the
-menu to see it, or choose **Quit** in its menu to stop. Only one copy runs at a time.
+Minimising the window sends it to the tray. The service keeps running when the frontend closes; use **Stop service**
+in the interface to stop it. Only one copy runs at a time.
 
 To start farming when you log in, without opening the window (`card-farm --background`):
 
@@ -134,6 +149,7 @@ python3 -m venv .venv && .venv/bin/pip install pytest
 .venv/bin/python -m pytest tests
 python3 -m cardfarm                # window
 python3 -m cardfarm --background   # farm without opening the window
+python3 -m cardfarm --tui          # terminal interface
 python packaging/build.py linux    # dist/card-farm.pyz; windows / macos need: pip install pyinstaller pywebview pillow
 ```
 

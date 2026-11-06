@@ -37,13 +37,29 @@ def main():
         return child(sys.argv[2])
     data = data_dir()
     background = "--background" in sys.argv
+    if "--tui" in sys.argv:
+        from .tui import run_tui
+        try:
+            return run_tui(data)
+        except RuntimeError as e:
+            sys.exit(str(e))
+    if "--service" in sys.argv:
+        import argparse
+        parser = argparse.ArgumentParser(prog="card-farm --service")
+        parser.add_argument("--service", action="store_true")
+        parser.add_argument("--host", default=os.environ.get("CARD_FARM_HOST", "127.0.0.1"))
+        parser.add_argument("--port", type=int, default=int(os.environ.get("CARD_FARM_PORT", "8765")))
+        args = parser.parse_args(sys.argv[1:])
+        from .farm import Farm
+        from .service import serve
+        return serve(lambda: Farm(data), args.host, args.port)
     from .farm import Farm
     if sys.platform.startswith("linux"):
         try:
             from .app import run_window
         except (ImportError, ValueError) as e:
             sys.exit(f"Card Farmer's Market needs GTK 4, libadwaita and WebKitGTK 6 with their Python bindings ({e}).")
-        sys.exit(run_window(lambda: Farm(data), background=background))
+        sys.exit(run_window(lambda: Farm(data), data, background=background))
     unblock_downloaded_files()
     try:
         from .app_webview import run_window
