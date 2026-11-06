@@ -92,6 +92,21 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
         self._starting(f"Steam asked to slow down; waiting {minutes} min…")
         self.log(f"Steam said too many requests; requests to {self.SITES.get(host, host)} wait {minutes} min", "warn")
 
+    def _remember_farmed(self, card, number):
+        """farm-history.json: every card this app farmed (number, when, card, game, foil, version), one
+        entry per drop, kept for good; the garden's flowers are these."""
+        path = self._path("farm-history.json")
+        try:
+            history = json.load(open(path))
+        except (OSError, ValueError):
+            history = []
+        history.append({"n": number, "at": round(time.time()), "appid": card["appid"], "card": card["name"],
+                        "game": card["game"], "foil": bool(card["foil"]), "version": update.VERSION})
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(history, f, indent=0)
+        os.replace(tmp, path)
+
     def _path(self, name):
         return os.path.join(self.data, name)
 
@@ -490,6 +505,7 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
                 if owed:
                     self.state["owed"][key] = owed[1:]
                     self.state["stats"]["drops"] += 1
+                    self._remember_farmed(card, self.state["stats"]["drops"] - 1)
                     if card["foil"]:
                         foils = self.state["stats"].setdefault("foil_drops", [])
                         foils.append(self.state["stats"]["drops"] - 1)
@@ -796,9 +812,6 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
                           for g in self._candidates(with_skipped=True)] if self.session.signed_in else [],
                 "kept_games": [{"appid": a, "name": names.get(a, str(a))} for a in sorted(keep)],
                 "drops_left": sum(g["drops"] for g in st["games"]),
-                # the garden's flowers: every card drop the badges page shows (so a garden doesn't start
-                # bare after an update or a reinstall), or the drops counted here when that's more
-                "garden": max(st["stats"]["drops"], sum(max(0, g["earned"] - g["drops"]) for g in st["games"])),
                 "review": st["review"], "history": st["history"][:80], "stats": st["stats"],
                 "items": {"inventories": [dict(i, on=i["key"] in self.settings["items_inventories"])
                                           for i in st["items"]["inventories"]],

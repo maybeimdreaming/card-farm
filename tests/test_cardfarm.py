@@ -957,6 +957,9 @@ def test_foil_drops_are_remembered_for_the_garden(world):
     f._refresh_badges(); f._check_inventory()
     assert f.state["stats"]["drops"] == 2 and f.state["stats"]["foil_drops"] == [1]
     assert f.snapshot()["stats"]["foil_drops"] == [1]
+    history = json.load(open(f._path("farm-history.json")))
+    assert [(e["n"], e["card"], e["foil"]) for e in history] == [(0, "Hero", False), (1, "Hero (Foil)", True)]
+    assert all(e["version"] and e["game"] == "Game" for e in history)
 
 
 def test_the_theme_is_a_setting():
@@ -984,13 +987,3 @@ def test_steam_errors_read_plainly():
     assert "couldn't reach Steam" in str(steam.HttpError(0))
     assert "servers are having trouble" in str(steam.HttpError(502))
     assert "sign in again" in str(steam.HttpError(403))
-
-
-def test_the_garden_counts_drops_from_the_badges_page_too(world):
-    f = world["make"]()
-    f.state["games"] = [{"appid": 10, "name": "A", "drops": 1, "earned": 4}, {"appid": 11, "name": "B", "drops": 0, "earned": 3}]
-    f.state["stats"]["drops"] = 2
-    snap = f.snapshot()
-    assert snap["garden"] == 6 and snap["stats"]["drops"] == 2  # "Cards farmed" stays what was farmed here
-    f.state["stats"]["drops"] = 9
-    assert f.snapshot()["garden"] == 9
