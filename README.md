@@ -157,6 +157,10 @@ code encoder (`cardfarm/qr.py`) and the icon were made for this project.
 Card Farmer's Market is free. If it saves you some time, you can leave a tip on
 [Ko-fi](https://ko-fi.com/m4ybe), also linked from the top of the app's window.
 
+## Thanks
+
+- [hardwarebob](https://github.com/hardwarebob), for the ideas behind clearer Steam errors, the shared "too many requests" pause and the farm history ([#1](https://github.com/maybeimdreaming/card-farmers-market/pull/1)).
+
 ## License
 
 MIT. See [NOTICE.md](NOTICE.md) for credits that apply to early versions in this repository's history.

@@ -3,6 +3,7 @@ Card Farmer's Market farms your Steam trading card drops, then sells each card o
 **New in 0.4:**
 - **A garden:** a new look, with the tabs on a strip of grass over rocky ground, and a flower in the grass for every card you farm (foil cards grow a shimmering one). Themes: Light, Dark, Pink, or Auto to follow your system.
 - Friendlier wording throughout, shorter explanations, and "Activity" instead of "Tape".
+- Thanks to **hardwarebob** for the ideas behind the next three changes and the farm history (pull request #1).
 - **Clearer problems:** when a game won't start, it says why (Steam not signed in, the game not owned, Steam's library broken); connection and Steam server troubles read in plain words.
 - **"Too many requests" pauses everything on that Steam site,** not just market prices, so the limit isn't kept tripped from another corner.
 - **Farm history:** every card the app farms is written to `farm-history.json` in its data folder (when, which card, foil or not, and the version that farmed it). The garden's flowers are the cards the app itself farmed.
