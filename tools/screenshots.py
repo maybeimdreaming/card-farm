@@ -16,7 +16,7 @@ import tempfile
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TABS = ["cards", "items", "market", "gems", "levelup"]
+TABS = ["cards", "items", "market", "gems", "badges"]
 NARROW = 430
 
 
@@ -156,6 +156,14 @@ def demo(farm):
     st["patient"] = [{"appid": 2004, "game": "Lantern Row", "hashes": ["2004-A", "2004-B"]}] * 2
     st["orders"] = [{"orderid": f"o{k}", "hash": f"2004-{n}", "price": p, "quantity": 2, "placed": now - 3600 * (k + 1)}
                     for k, (n, p) in enumerate([("Night Market", 3), ("Paper Moon", 5), ("Gull's Way", 4)])]
+    st["quick"] = {"level": 21, "xp_to_next": 140, "checked": now, "search": {"text": "", "results": [], "at": 0},
+                   "names": {"2001": "Copper Kettle", "2005": "Moth Lamp", "2006": "Glass Harbor"},
+                   "badges": {"1000": 3, "1001": 1, "1002": 4, "2005": 5, "2006": 5, "2001": 2}, "pick": {
+        "appid": 1000, "game": "Ember Hollow", "level": 3, "set_size": 6, "wallet": 3111, "checked": now - 120,
+        "cards": [{"hash": f"1000-{n}", "name": n, "have": have, "sell": sell, "listed": sum(c for _, c in sell)} for n, have, sell in [
+            ("Ash Gate", 1, [[6, 31], [7, 12], [9, 4]]), ("Cinder Path", 0, [[5, 2], [6, 40], [8, 9]]),
+            ("Low Tide", 2, [[7, 18], [8, 3]]), ("Kite String", 0, [[4, 1], [5, 1], [6, 22], [7, 30], [9, 3], [11, 2], [15, 1]]),
+            ("Rust Bolt", 1, [[9, 6], [10, 14]]), ("Lantern Keeper", 0, [[12, 3], [13, 8]])]]}}
     farm.update = {"version": "v0.4.0-beta.1", "page": "https://example.invalid", "url": "x", "sha256": ""}
     farm.status = "Farming 3 games"
 

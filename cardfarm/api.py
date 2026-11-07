@@ -89,6 +89,14 @@ def route(farm, path, body):
         return farm.check_levelup()
     if path == "/api/levelup/go":
         return farm.level_up()
+    if path == "/api/badges/check":
+        return farm.check_badges()
+    if path == "/api/badges/search":  # {"text"}
+        return farm.search_badges(body.get("text"))
+    if path == "/api/badges/price":  # {"appid", "game"?}
+        return farm.price_badge(int(body["appid"]), body.get("game"))
+    if path == "/api/badges/go":  # {"appid", "target"}
+        return farm.quick_badge(int(body["appid"]), int(body["target"]))
     if path == "/api/update":
         return farm.install_update()
     if path == "/api/refresh":

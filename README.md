@@ -21,7 +21,6 @@ your system.
   - You can also keep foils, keep every card from chosen games, set a minimum price, and match the lowest listing or undercut it by 1¢.
   - Only real card drops are handled automatically. A card that turns up any other way (a trade, a booster pack, one you bought to finish a badge) waits for your review.
 - **Sort the cards you already have.** "Sort cards I have" runs your whole inventory through the same rules. Cards already listed and waiting for confirmation are left out.
-- **Finish sets.** Sets you hold most of are listed with what the missing cards cost. "Buy & craft" checks every missing card's price against your limit before buying anything, then crafts the badge. A set's cards aren't sold while you're finishing it.
 
 ### Items
 
@@ -40,11 +39,15 @@ The Items tab finds your other inventories (Counter-Strike 2, Team Fortress 2, t
 - **Booster packs worth making.** A pack is worth it when it sells for more than its gems would as sacks. It's valued at what it really sold for in the last day, and only counts if it sells at all. "Make & list all worth it" makes them with the gems you have.
 - **Booster packs you have.** Each one is either sold as a pack or opened into 3 cards, whichever is worth more (or opened when it's for a set you're finishing). Opened cards go to the review list.
 
-### Level up
+### Badges
 
-![The Level up tab](docs/levelup.png)
+![The Badges tab](docs/badges.png)
 
-Pick a Steam level and a budget. It finds the cheapest badge crafts: sets you hold part of (counting what your own cards would sell for instead), and the market's cheapest full sets. **Level up** then buys the cards and crafts the badges, either **now** at the cheapest listings, or with **buy orders** about 15% under the cheapest price that fill over hours or days (unfilled orders are cancelled after a week, or when you say). Each set is crafted as soon as its cards are in.
+- **Quick badge: one game to level 5.** Your badges are listed (started, not crafted yet, at level 5), along with the market's cheapest sets, and a search finds any game with trading cards. Pick one and every card's listings are read straight from the market's order book (how many are listed at each price), with the cards you already have counted, so the cost of each level up to 5 is exact. One button buys those listings and crafts the levels; if some sell first it buys the next ones, never more than 10% (at least 5¢) over the quote, and never more than your Steam wallet holds.
+- **Finish sets.** Sets you hold most of are listed with what the missing cards cost. "Buy & craft" checks every missing card's price against your limit before buying anything, then crafts the badge. A set's cards aren't sold while you're finishing it.
+- **Reach a Steam level.** Pick a Steam level and a budget. It finds the cheapest badge crafts: sets you hold part of (counting what your own cards would sell for instead), and the market's cheapest full sets. **Level up** then buys the cards and crafts the badges, either **now** at the cheapest listings, or with **buy orders** about 15% under the cheapest price that fill over hours or days (unfilled orders are cancelled after a week, or when you say). Each set is crafted as soon as its cards are in.
+
+The Activity log sits under every tab.
 
 ### Everywhere
 

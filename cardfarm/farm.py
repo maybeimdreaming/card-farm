@@ -8,7 +8,7 @@ import threading
 import time
 import traceback
 
-from . import http, market, qr, rules, steam, update
+from . import http, market, qr, quick, rules, steam, update
 from .auth import Session
 from .idler import Idler, game_you_are_playing, steam_pid
 
@@ -42,10 +42,11 @@ def fresh_state():
             "playtime": {},        # appid -> minutes played, from Steam (games with drops only)
             "bulk": {},            # appid -> {"base": minutes when bulk idling began, "secs": bulk idled since}
             "items": {"inventories": [], "review": [], "seen": {}, "checked": 0},
-            **market.market_state()}
+            **market.market_state(),
+            "quick": quick.quick_state()}
 
 
-class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
+class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying, quick.QuickBadge):
     def __init__(self, data_dir):
         self.data = data_dir
         os.makedirs(data_dir, exist_ok=True)
@@ -747,6 +748,8 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
             return self._do_open(e)
         if e["kind"] == "orders":
             return self._do_orders(e)
+        if e["kind"] == "quick":
+            return self._do_quick(e)
         if e["kind"] == "item":
             it = e["item"]
             buyer = rules.asking_price(rules.realistic(self.prices.item_stats(it["appid"], it["hash"])), self.settings)
@@ -825,6 +828,11 @@ class Farm(market.MarketParts, market.HeldBoosters, market.PatientBuying):
                 "orders": st.get("orders", []), "patient": st.get("patient", []),
                 "levelup": dict({k: v for k, v in st["levelup"].items() if k != "options"},
                                 options=len(st["levelup"]["options"]), plan=self.levelup_plan()),
+                "quick": {"level": self._quick()["level"], "xp_to_next": self._quick()["xp_to_next"], "checked": self._quick()["checked"],
+                          "badges": sum(1 for v in self._quick()["badges"].values() if v > 0),
+                          "maxed": sum(1 for v in self._quick()["badges"].values() if v >= quick.TOP),
+                          "search": {k: v for k, v in self._quick()["search"].items() if k != "results"},
+                          "rows": self.quick_rows(), "pick": self.quick_plans()},
             }
 
     def _qr(self):
@@ -891,7 +899,7 @@ def _owed_list(value):
 
 
 VERBS = {"gems": "turn into gems", "set": "finish", "booster": "make", "pack": "pack", "sell": "sell", "open": "open",
-         "reprice": "reprice", "cancel": "cancel", "orders": "place"}
+         "reprice": "reprice", "cancel": "cancel", "orders": "place", "quick": "level up"}
 
 
 def _label(e):
@@ -900,7 +908,7 @@ def _label(e):
     return {"card": lambda: e["card"]["name"], "item": lambda: e["item"]["name"], "listing": lambda: e["listing"]["name"],
             "gems": lambda: "your gems", "booster": lambda: f"the booster pack for {e['booster']['name']}",
             "set": lambda: f"the {e['offer']['game']} set", "pack": lambda: f"the {e['pack']['game']} booster pack",
-            "orders": lambda: "the buy orders"}[kind]()
+            "orders": lambda: "the buy orders", "quick": lambda: f"the {e['game']} badge"}[kind]()
 
 
 def _page_version():

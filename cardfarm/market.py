@@ -410,7 +410,7 @@ class MarketParts:
             self.log(f"Stopped finishing the {done['game']} set; its cards follow your rules again")
         self.save()
 
-    def _place_order(self, hash_name, price, quantity=1):
+    def _place_order(self, hash_name, price, quantity=1, job="sets"):
         """Place a buy order, waiting (up to 10 min) for its OK in the Steam app when Steam asks for
         one: once given, the same order sent again with the confirmation's id goes through."""
         name = hash_name.split("-", 1)[1]
@@ -419,7 +419,7 @@ class MarketParts:
             return order
         self.notify("Confirm the purchase", f"Approve buying {name} in the Steam mobile app (Confirmations).")
         self.log(f"Waiting for you to confirm buying {name} in the Steam mobile app (up to 10 min)", "warn")
-        self.progress["sets"] = f"Confirm buying {name} in the Steam app…"
+        self.progress[job] = f"Confirm buying {name} in the Steam app…"
         try:
             for _ in range(120):
                 time.sleep(5)
@@ -428,7 +428,7 @@ class MarketParts:
                     return again
             raise RuntimeError(f"buying {name} wasn't confirmed in the Steam app within 10 minutes")
         finally:
-            self.progress.pop("sets", None)
+            self.progress.pop(job, None)
 
     def _buy(self, hash_name, price):
         """Buy one at `price` through a buy order; True once Steam says it was bought. An order

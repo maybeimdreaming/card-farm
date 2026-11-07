@@ -129,6 +129,8 @@ button.link:hover:not(:disabled) { background: none; color: var(--ink); text-dec
   .figures { grid-template-columns: repeat(2, 1fr); }
   .figures b { font-size: 22px; }
 }
+/* a note under a row of figures sits on the ground: give it a panel of its own to be read on */
+.figures + .note { display: inline-block; background: var(--sheet); border-radius: 10px; padding: 7px 14px; margin-top: 12px; box-shadow: var(--lift); max-width: 100%; }
 .now { font-size: 13px; color: var(--faint); background: var(--sheet); border-radius: 10px; padding: 8px 14px; margin-top: 12px; box-shadow: var(--lift); }
 .now:empty { display: none; }
 
@@ -203,6 +205,29 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
 .split > section { margin-top: 20px; }
 @media (max-width: 860px) { .split { grid-template-columns: 1fr; } .split > section + section { margin-top: 0; } }
 
+/* Quick badge: a search box, the badge's level as five pips, each card's listings by price */
+input.find { font: 500 13.5px/1 var(--font-ui); color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-strong);
+  border-radius: var(--radius); padding: 8px 10px; width: 240px; max-width: 100%; }
+.findbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 0 4px; }
+.findbar .pick { margin-left: auto; }
+.ladder.under { display: none; }
+@media (max-width: 760px) { .findbar .pick { margin-left: 0; width: 100%; flex-wrap: nowrap; } .findbar .pick button { flex: 1 1 auto; padding: 7px 4px; }
+  .findbar input.find { flex: 1 1 160px; } }
+@media (max-width: 620px) { .ladder.under { display: block; } }  /* the listings column is hidden: show them under the card */
+.pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+.pips i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--rule-strong); }
+.pips i.got { background: var(--signal); border-color: var(--signal); }
+.pips i.goal { border-color: var(--signal); border-style: dashed; }
+.lvl { font-size: 12px; color: var(--faint); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.ladder { font-size: 12.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.ladder b { color: var(--ink); font-weight: 600; }
+.ladder .used { color: var(--ink); }
+.targets { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 4px; }
+.targets button { text-align: left; line-height: 1.3; padding: 8px 12px; }
+.targets button small { display: block; font-weight: 500; color: var(--faint); font-variant-numeric: tabular-nums; }
+.targets button.on { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
+.targets button.on small { color: var(--signal-ink); opacity: .85; }
+tr.picked td { background: color-mix(in srgb, var(--signal) 10%, var(--sheet)); }
 /* earnings chart: one column per day */
 .chart { position: relative; margin-top: 14px; }
 .chart svg { display: block; width: 100%; height: 150px; }
@@ -253,7 +278,7 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
   <div class="mast">
     <div class="flowers" id="flowers"></div>
     <div class="tabs" id="tabs" hidden>
-      <button data-tab="cards">Cards<span class="count" id="tab-cards"></span></button><button data-tab="items">Items<span class="count" id="tab-items"></span></button><button data-tab="market">Market<span class="count" id="tab-market"></span></button><button data-tab="gems">Gems<span class="count" id="tab-gems"></span></button><button data-tab="levelup">Level up</button>
+      <button data-tab="cards">Cards<span class="count" id="tab-cards"></span></button><button data-tab="items">Items<span class="count" id="tab-items"></span></button><button data-tab="market">Market<span class="count" id="tab-market"></span></button><button data-tab="gems">Gems<span class="count" id="tab-gems"></span></button><button data-tab="badges">Badges</button>
     </div>
     <span class="pick theme" data-key="theme" title="Theme"><button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button><button data-v="pink">Pink</button></span>
     <span class="who" id="who"></span>
@@ -324,23 +349,6 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
         </div>
     </section>
 
-    <section class="settings">
-      <div class="head"><h2>Finish sets <span id="sets-count" class="faint"></span></h2>
-        <div class="tools"><button id="sets-check">Find sets</button></div></div>
-      <div class="line"><span>Spend at most<small>per set, on the cards it's missing</small></span>
-        <input class="money" inputmode="decimal" title="An amount, like 50¢ or $5" data-key="set_budget_cents"></div>
-      <div class="alert" id="sets-progress" hidden></div>
-      <div class="line wide" id="finishing-line" hidden><span>Finishing<small>these sets' cards aren't sold or turned into gems until the badge is crafted</small></span>
-        <span class="chips" id="finishing"></span></div>
-      <p class="note" id="sets-note">Sets you own some cards of. "Buy &amp; craft" checks the prices first and buys nothing if
-        the set costs more than your limit.</p>
-      <div class="scroll">
-        <table>
-          <thead id="sets-head"><tr><th>Game</th><th class="r">Have</th><th class="pl">Missing</th><th class="r">They cost</th><th class="r hide-sm">Yours sell for</th><th></th></tr></thead>
-          <tbody id="sets"></tbody>
-        </table>
-      </div>
-    </section>
 
     <section class="settings">
       <div class="head"><h2>Rules</h2></div>
@@ -370,11 +378,6 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
         <div class="line wide"><span>Keep every card from<small>for sets you're crafting; mark games below</small></span>
           <span class="chips" id="kept-games"></span></div>
       </div>
-    </section>
-
-    <section>
-      <div class="head"><h2>Activity</h2></div>
-      <div class="tape"></div>
     </section>
     </div>
 
@@ -424,11 +427,6 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
           </table>
         </div>
         <p class="note">New items can take a few days to become marketable; they show up here once they are.</p>
-    </section>
-
-    <section>
-      <div class="head"><h2>Activity</h2></div>
-      <div class="tape"></div>
     </section>
     </div>
 
@@ -533,19 +531,69 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
     </section>
     </div>
 
-    <div id="tab-panel-levelup" hidden>
+    <div id="tab-panel-badges" hidden>
     <section>
       <div class="figures">
         <div><b id="l-level">–</b><span>Steam level</span></div>
         <div><b id="l-next">–</b><span>XP to the next</span></div>
         <div><b id="l-maxed">–</b><span>Badges at level 5</span></div>
-        <div><b id="l-cost">–</b><span>Plan costs</span></div>
+        <div><b id="q-wallet">–</b><span>Steam wallet</span></div>
       </div>
-      <p class="note">Each badge level is 100 XP and takes one full set of a game's cards. This finds the cheapest sets to craft.</p>
+      <p class="note">Each badge level is 100 XP and takes one full set of a game's cards. Take one game to level 5, finish sets you already
+        hold most of, or let it find the cheapest sets for a Steam level.</p>
+    </section>
+
+    <section>
+      <div class="head"><h2>Pick a game <span id="badges-count" class="faint"></span></h2>
+        <div class="tools"><button id="badges-check">Read my badges</button></div></div>
+      <form class="findbar" id="badge-find">
+        <input class="find" id="badge-text" type="search" placeholder="Any game with cards" aria-label="Game name" autocomplete="off">
+        <button id="badge-search" type="submit">Search the market</button>
+        <span class="pick" id="badge-list"><button type="button" data-list="started">Started</button><button type="button" data-list="new">Not crafted</button><button type="button" data-list="cheap">Cheapest</button><button type="button" data-list="maxed">Level 5</button><button type="button" data-list="found">Found</button></span>
+      </form>
+      <div class="scroll">
+        <table>
+          <thead id="badges-head"><tr><th>Game</th><th>Badge</th><th class="r">One set</th><th></th></tr></thead>
+          <tbody id="badges"></tbody>
+        </table>
+      </div>
+      <p class="note" id="badges-note"></p>
+    </section>
+
+    <section id="pick-section" hidden>
+      <div class="head"><h2 id="pick-title"></h2>
+        <div class="tools"><button id="pick-again">Price again</button><button id="pick-go" class="go"></button></div></div>
+      <div class="targets" id="pick-targets"></div>
+      <div class="alert" id="pick-alert" hidden></div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Card</th><th class="r">You have</th><th class="r">Buy</th><th class="pl hide-sm">Listed (price × how many)</th><th class="r">Costs</th></tr></thead>
+          <tbody id="pick-cards"></tbody>
+        </table>
+      </div>
+      <p class="note" id="pick-note"></p>
     </section>
 
     <section class="settings">
-      <div class="head"><h2>Goal</h2>
+      <div class="head"><h2>Finish sets <span id="sets-count" class="faint"></span></h2>
+        <div class="tools"><button id="sets-check">Find sets</button></div></div>
+      <div class="line"><span>Spend at most<small>per set, on the cards it's missing</small></span>
+        <input class="money" inputmode="decimal" title="An amount, like 50¢ or $5" data-key="set_budget_cents"></div>
+      <div class="alert" id="sets-progress" hidden></div>
+      <div class="line wide" id="finishing-line" hidden><span>Finishing<small>these sets' cards aren't sold or turned into gems until the badge is crafted</small></span>
+        <span class="chips" id="finishing"></span></div>
+      <p class="note" id="sets-note">Sets you own some cards of. "Buy &amp; craft" checks the prices first and buys nothing if
+        the set costs more than your limit.</p>
+      <div class="scroll">
+        <table>
+          <thead id="sets-head"><tr><th>Game</th><th class="r">Have</th><th class="pl">Missing</th><th class="r">They cost</th><th class="r hide-sm">Yours sell for</th><th></th></tr></thead>
+          <tbody id="sets"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="settings">
+      <div class="head"><h2>Reach a Steam level</h2>
         <div class="tools"><button id="levelup-check">Find the cheapest way</button><button id="levelup-go" class="go">Level up</button></div></div>
       <div class="sheet">
         <div><div class="line"><span>Reach level<small>0 for the next one</small></span><input type="number" min="0" data-key="levelup_target"></div></div>
@@ -558,7 +606,7 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
     </section>
 
     <section>
-      <div class="head"><h2>Plan <span id="levelup-sum" class="faint"></span></h2></div>
+      <div class="head"><h2>Cheapest sets for it <span id="levelup-sum" class="faint"></span></h2></div>
       <div class="scroll">
         <table>
           <thead id="levelup-head"><tr><th>Game</th><th class="r">Craft</th><th class="r">Cards cost</th><th class="r hide-sm" title="What your own cards of the set would sell for instead">Yours sell for</th><th class="hide-sm pl">From</th></tr></thead>
@@ -581,6 +629,11 @@ td.acts a:hover { color: var(--ink); text-decoration: underline; }
       </div>
     </section>
     </div>
+
+    <section>
+      <div class="head"><h2>Activity</h2></div>
+      <div class="tape"></div>
+    </section>
   </div>
 </main>
 
@@ -609,7 +662,7 @@ const age = t => { const d = (Date.now() / 1000 - t) / 86400; return d < 1 ? hou
 const busyText = (s, job, idle, working) => s.busy.includes(job) ? (s.progress[job] || working) : idle;
 let state = null, qrShown = null, uiVersion = null;
 let tab = "cards";
-try { const t = localStorage.getItem("tab"); tab = ["items", "market", "gems", "levelup"].includes(t) ? t : "cards"; } catch {}
+try { const t = localStorage.getItem("tab"); tab = ["items", "market", "gems", "badges"].includes(t) ? t : t === "levelup" ? "badges" : "cards"; } catch {}
 
 // Windows and macOS open the page as a file and reach the farm through pywebview's bridge;
 // the Linux window serves it from cardfarm:// and answers fetch()
@@ -893,10 +946,6 @@ function renderSets(s) {
 
 function renderLevelup(s) {
   const lu = s.levelup, p = lu.plan;
-  $("#l-level").textContent = lu.checked ? lu.level : "–";
-  $("#l-next").textContent = lu.checked ? lu.xp_to_next : "–";
-  $("#l-maxed").textContent = lu.checked ? lu.maxed : "–";
-  $("#l-cost").textContent = p.crafts.length ? money(p.cost) : "–";
   $("#levelup-check").disabled = s.busy.includes("levelup");
   $("#levelup-check").textContent = busyText(s, "levelup", "Find the cheapest way", "Looking…");
   $("#levelup-go").disabled = !p.crafts.length;
@@ -909,6 +958,84 @@ function renderLevelup(s) {
     : p.crafts.map(c => `<tr><td class="cardname"><b>${esc(c.game)}</b><span class="faint">${esc(c.missing.slice(0, 5).join(", "))}${c.missing.length > 5 ? ` +${c.missing.length - 5}` : ""}</span></td>
       <td class="r num">+100 XP</td><td class="r num">${money(c.cost)}</td><td class="r num hide-sm">${c.forgone ? money(c.forgone) : "–"}</td>
       <td class="hide-sm pl small">${c.source === "yours" ? "your partial set" : "market"}</td></tr>`).join(""));
+}
+
+let badgeList = null, badgeTarget = null;
+const pips = (level, goal) => `<span class="pips" title="Level ${level} of 5">${[1, 2, 3, 4, 5].map(k =>
+  `<i class="${k <= level ? "got" : goal && k <= goal ? "goal" : ""}"></i>`).join("")}</span>`;
+const cents = c => c < 100 ? c + "¢" : money(c);
+
+function renderBadges(s) {
+  const q = s.quick, rows = q.rows, pick = q.pick, busy = j => s.busy.includes(j);
+  const me = q.checked >= (s.levelup.checked || 0) ? q : s.levelup;  // whichever read your badges last
+  $("#l-level").textContent = me.checked ? me.level : "–";
+  $("#l-next").textContent = me.checked ? me.xp_to_next : "–";
+  $("#l-maxed").textContent = me.checked ? me.maxed : "–";
+  $("#q-wallet").textContent = pick && pick.wallet != null ? money(pick.wallet) : "–";
+  $("#badges-check").disabled = busy("badges");
+  $("#badges-check").textContent = busy("badges") ? "Reading…" : "Read my badges";
+  $("#badge-search").disabled = busy("badge-search");
+  $("#badge-search").textContent = busy("badge-search") ? "Searching…" : "Search the market";
+  if (!badgeList) badgeList = rows.started.length ? "started" : "new";
+  const names = {started: "Started", new: "Not crafted", cheap: "Cheapest", maxed: "Level 5", found: "Found"};
+  document.querySelectorAll("#badge-list button").forEach(b => {
+    b.classList.toggle("on", b.dataset.list === badgeList);
+    b.textContent = names[b.dataset.list] + (rows[b.dataset.list].length ? ` ${rows[b.dataset.list].length}` : "");
+  });
+  const text = $("#badge-text").value.trim().toLowerCase();
+  const list = rows[badgeList].filter(r => !text || badgeList === "found" || r.game.toLowerCase().includes(text));
+  $("#badges-count").textContent = q.checked ? `(${q.badges} badge${q.badges === 1 ? "" : "s"})` : "";
+  $("#badges-head").hidden = !list.length;
+  const empty = {started: q.checked ? "No badges between level 1 and 4." : "Press Read my badges.",
+    new: "No games with cards waiting for their first badge.", maxed: q.checked ? "No badges at level 5 yet." : "Press Read my badges.",
+    cheap: "Press Find the cheapest way under Reach a Steam level, below.",
+    found: q.search.text ? `Nothing with trading cards matches “${esc(q.search.text)}”.` : "Type a game's name and press Search the market."};
+  const pricing = busy("badge");
+  fill($("#badges"), !list.length ? `<tr><td colspan="4" class="empty">${text && rows[badgeList].length ? "Nothing on this list matches; try Search the market." : empty[badgeList]}</td></tr>`
+    : list.slice(0, 200).map(r => `<tr class="${pick && pick.appid === r.appid ? "picked" : ""}${r.level >= 5 ? " dim" : ""}">
+      <td>${esc(r.game)}</td><td class="nowrap">${pips(r.level)}<span class="lvl">${r.level}/5</span></td>
+      <td class="r num">${r.set != null ? money(r.set) : r.cheapest != null ? `<span class="faint" title="Its cheapest card">from ${cents(r.cheapest)}</span>` : "–"}</td>
+      <td class="acts">${r.level >= 5 ? '<span class="small faint">done</span>'
+        : `<button data-badge="${r.appid}" data-game="${esc(r.game)}" ${pricing ? "disabled" : ""}>${pick && pick.appid === r.appid ? "Price again" : 'Price<span class="hide-sm"> to level 5</span>'}</button>`}</td></tr>`).join(""));
+  $("#badges-note").textContent = pricing ? (s.progress.badge || "Pricing…") : badgeList === "cheap"
+    ? "One set is one level. These come from Find the cheapest way, below." : "";
+  $("#badges-note").hidden = !$("#badges-note").textContent;
+
+  $("#pick-section").hidden = !pick;
+  if (!pick) return;
+  const plans = pick.plans;
+  if (!plans.length) {
+    $("#pick-title").innerHTML = `${esc(pick.game)} <span class="faint">(level ${pick.level}: done)</span>`;
+    fill($("#pick-targets"), ""); fill($("#pick-cards"), ""); $("#pick-go").hidden = true; $("#pick-alert").hidden = true;
+    $("#pick-note").textContent = ""; return;
+  }
+  if (!plans.some(p => p.target === badgeTarget)) badgeTarget = plans[plans.length - 1].target;
+  const p = plans.find(x => x.target === badgeTarget);
+  $("#pick-title").innerHTML = `${esc(pick.game)} <span class="faint">${pips(pick.level, p.target)} level ${pick.level} → ${p.target}</span>`;
+  fill($("#pick-targets"), plans.map(x => `<button data-target="${x.target}" class="${x.target === badgeTarget ? "on" : ""}">Level ${x.target}
+    <small>${x.short.length ? "not enough listed" : money(x.cost) + (x.buying ? ` · ${x.buying} card${x.buying > 1 ? "s" : ""}` : " · nothing to buy")}</small></button>`).join(""));
+  const old = Date.now() / 1000 - pick.checked > 1800;
+  const over = pick.wallet != null && p.cost > pick.wallet;
+  const problems = [pick.missing ? `${pick.missing} of its ${pick.set_size} cards aren't on the market right now, so the set can't be bought.` : "",
+    p.short.length ? `Not enough listed of ${p.short.slice(0, 3).join(", ")}${p.short.length > 3 ? ` and ${p.short.length - 3} more` : ""} for level ${p.target}.` : "",
+    over ? `That's more than your Steam wallet (${money(pick.wallet)}).` : "",
+    old ? `Priced ${ago(pick.checked)} ago: price it again before buying.` : ""].filter(Boolean);
+  $("#pick-alert").hidden = !problems.length;
+  $("#pick-alert").textContent = problems.join(" ");
+  $("#pick-go").hidden = false;
+  $("#pick-go").disabled = problems.length > 0 || busy("badge");
+  $("#pick-go").textContent = p.buying ? `Buy ${p.buying} card${p.buying > 1 ? "s" : ""} & craft (${money(p.cost)})` : `Craft to level ${p.target}`;
+  $("#pick-again").disabled = busy("badge");
+  $("#pick-again").textContent = busy("badge") ? "Pricing…" : "Price again";
+  fill($("#pick-cards"), pick.cards.map((c, i) => { const b = p.cards[i];
+    let left = b.need;  // the listings this plan buys are shown in full ink
+    const ladder = c.sell.slice(0, 6).map(([price, n]) => { const used = left > 0; left -= n;
+      return `<span class="${used ? "used" : ""}">${used ? "<b>" + cents(price) + "</b>" : cents(price)} ×${n}</span>`; }).join(" · ")
+      + (c.sell.length > 6 ? " · …" : "");
+    return `<tr class="${b.need ? "" : "dim"}"><td>${esc(c.name)}<span class="ladder under">${c.sell.length ? ladder : "none listed"}</span></td><td class="r num">${c.have}</td><td class="r num">${b.need || "–"}</td>
+      <td class="pl hide-sm ladder">${c.sell.length ? ladder : "none listed"}</td><td class="r num">${b.need ? money(b.cost) : "–"}</td></tr>`; }).join(""));
+  $("#pick-note").textContent = `Each level uses one of each card. Prices are the actual listings on the market ${ago(pick.checked)} ago`
+    + `; buying goes up to ${money(p.cost + Math.max(5, Math.round(p.cost * 0.1)))} if some sell first, never more. Cards for it aren't sold or turned into gems in the meantime.`;
 }
 
 function renderHeld(s) {
@@ -1011,6 +1138,7 @@ function render(s) {
   renderGems(s);
   renderSets(s);
   renderLevelup(s);
+  renderBadges(s);
   renderHeld(s);
   renderOrders(s);
 }
@@ -1027,7 +1155,12 @@ document.addEventListener("click", e => {
   const t = e.target.closest("button");
   if (!t || !state) return;
   const s = state.settings, d = t.dataset;
-  if (d.tab) { tab = d.tab; try { localStorage.setItem("tab", tab); } catch {} return renderTabs(); }
+  if (d.tab) { tab = d.tab; try { localStorage.setItem("tab", tab); } catch {}
+    if (tab === "badges" && !state.busy.includes("badges") && Date.now() / 1000 - state.quick.checked > 1800) post("/api/badges/check");
+    return renderTabs(); }
+  if (d.list) { badgeList = d.list; return renderBadges(state); }
+  if (d.target) { badgeTarget = +d.target; return renderBadges(state); }
+  if (d.badge) { badgeTarget = null; return post("/api/badges/price", {appid: +d.badge, game: d.game}); }
   if (t.classList.contains("toggle")) return setting(d.key, !t.classList.contains("on"));
   const pick = t.closest(".pick");
   if (pick) {
@@ -1105,6 +1238,18 @@ $("#orders-cancel").onclick = () => confirm(`Cancel all ${state.orders.length} b
 $("#held-do").onclick = () => confirm(`Do the suggestion for all ${state.held.packs.length} booster packs? Opened packs can't be undone; listings need your OK in the Steam app.`)
   && post("/api/held", {ids: "suggested", action: "suggested"});
 $("#levelup-check").onclick = () => post("/api/levelup/check");
+$("#badges-check").onclick = () => post("/api/badges/check");
+$("#badge-text").oninput = () => state && renderBadges(state);
+$("#badge-find").onsubmit = e => { e.preventDefault(); const text = $("#badge-text").value.trim();
+  if (text.length < 2) return;
+  badgeList = "found"; $("#badge-text").value = ""; post("/api/badges/search", {text}); };
+$("#pick-again").onclick = () => post("/api/badges/price", {appid: state.quick.pick.appid});
+$("#pick-go").onclick = () => { const pick = state.quick.pick, p = pick.plans.find(x => x.target === badgeTarget);
+  const most = p.cost + Math.max(5, Math.round(p.cost * 0.1));
+  return confirm(p.buying
+    ? `Buy ${p.buying} ${pick.game} card${p.buying > 1 ? "s" : ""} for ${money(p.cost)} from your Steam wallet (at most ${money(most)} if some sell first), then craft the badge from level ${pick.level} to ${p.target}? Crafting uses up the cards; Steam may ask you to approve purchases in the mobile app.`
+    : `Craft the ${pick.game} badge from level ${pick.level} to ${p.target} with the cards you have? Crafting uses them up.`)
+    && post("/api/badges/go", {appid: pick.appid, target: p.target}); };
 $("#levelup-go").onclick = () => { const p = state.levelup.plan;
   const orders = state.settings.levelup_buying === "orders";
   return confirm(orders

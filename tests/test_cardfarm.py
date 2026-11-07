@@ -987,3 +987,69 @@ def test_steam_errors_read_plainly():
     assert "couldn't reach Steam" in str(steam.HttpError(0))
     assert "servers are having trouble" in str(steam.HttpError(502))
     assert "sign in again" in str(steam.HttpError(403))
+
+
+# --- quick badge ----------------------------------------------------------------------------
+from cardfarm import quick as quick_mod
+
+
+def ssr_page(queries):
+    query_data = json.dumps({"queries": [{"queryKey": k, "state": {"data": d}} for k, d in queries]})
+    return f'<html><script id="valve-ssr-data" type="application/json">{json.dumps({"renderContext": {"queryData": query_data}})}</script>'
+
+
+def test_the_order_book_counts_listings_at_each_price_without_yours():
+    page = ssr_page([
+        (["CurrentUserWalletDetails", 1], {"has_wallet": True, "balance": "3111", "currency_code": 1}),
+        (["market_item_search", {}], {"pages": [{"listings": [{"listingid": "9", "unPrice": 6, "unFee": 2, "eCurrency": 1, "bMine": True}]}]}),
+        (["market", "orderbook", 753, "10-Hero"], {"eCurrency": 1, "rgCompactSellOrders": [7, 49, 8, 2, 12, 1]})])
+    assert steam.parse_order_book(page) == {"sell": [[7, 49], [8, 1], [12, 1]], "listed": 51, "wallet": 3111}
+
+
+def test_buying_walks_up_the_order_book():
+    assert quick_mod.buy_lots([[7, 2], [8, 1], [12, 5]], 4) == [[7, 2], [8, 1], [12, 1]]
+    assert quick_mod.buy_lots([[7, 2]], 3) is None and quick_mod.buy_lots([[7, 2]], 0) == []
+
+
+def test_a_badge_plan_counts_the_cards_you_have():
+    pick = {"level": 2, "cards": [{"hash": "10-A", "name": "A", "have": 1, "sell": [[5, 1], [6, 9]]},
+                                  {"hash": "10-B", "name": "B", "have": 0, "sell": [[9, 2]]}]}
+    plan = quick_mod.badge_plan(pick, 5)         # 3 levels: A needs 2 more (5 + 6), B needs 3, only 2 listed
+    assert plan["levels"] == 3 and plan["cards"][0]["lots"] == [[5, 1], [6, 1]] and plan["short"] == ["B"]
+    plan = quick_mod.badge_plan(pick, 4)         # 2 levels: A 1 more, B 2
+    assert plan["cost"] == 5 + 18 and plan["buying"] == 3 and not plan["short"]
+
+
+def quick_world(world, monkeypatch, wallet=1000):
+    log = buying_world(monkeypatch)
+    monkeypatch.setattr(quick_mod.time, "sleep", lambda x: None)
+    monkeypatch.setattr(steam, "buy_order_status", lambda s, o: {"quantity": "9", "quantity_remaining": "0"})
+    books = {"7-A": [[3, 5], [4, 5]], "7-B": [[5, 1], [9, 9]]}
+    monkeypatch.setattr(steam, "order_book", lambda s, p, h: {"sell": books[h], "listed": 10, "wallet": wallet})
+    monkeypatch.setattr(steam, "card_set", lambda s, a: {"level": 1, "cards": [{"name": "A", "owned": 0}, {"name": "B", "owned": 0}]})
+    f = world["make"]()
+    f.prices.game_cards = lambda appid: {"7-A": 3, "7-B": 5, "7-A (Foil)": 40}
+    world["cards"] = [card(assetid="x", appid=7, hash="7-B", name="B")]
+    return f, log
+
+
+def test_quick_badge_prices_buys_and_crafts_to_the_top(world, monkeypatch):
+    f, log = quick_world(world, monkeypatch)
+    f._price_badge(7)
+    pick = f.quick_plans()
+    assert [c["have"] for c in pick["cards"]] == [0, 1] and [p["target"] for p in pick["plans"]] == [2, 3, 4, 5]
+    top = pick["plans"][-1]                      # 4 levels: A ×4 at 3c; B ×3 more: 5c + 9c + 9c
+    assert top["cost"] == 12 + 23 and top["buying"] == 7
+    f.quick_badge(7, 5)
+    assert f.finishing(7) and f.state["quick"]["pick"] is None
+    f._do_quick(f.state["queue"][0]["entry"])
+    assert ("order", "7-A", 3, 4) in log and ("order", "7-B", 5) in log and ("order", "7-B", 9, 2) in log
+    assert log.count(("craft", 7)) == 4 and not f.finishing(7)
+
+
+def test_quick_badge_wont_spend_past_the_wallet(world, monkeypatch):
+    f, log = quick_world(world, monkeypatch, wallet=20)
+    f._price_badge(7)
+    with pytest.raises(ValueError, match="wallet"):
+        f.quick_badge(7, 5)
+    assert not f.state["queue"] and not f.finishing(7)

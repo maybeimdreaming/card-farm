@@ -224,6 +224,11 @@ class Prices:
                 total, start = d.get("total_count", 0), start + 10
             return self._remember(key, prices)
 
+    def known_cards(self, appid):
+        """game_cards from the cache only (None when it hasn't been looked up lately): no request."""
+        hit = self._fresh(f"cards:{appid}")
+        return hit["v"] if hit else None
+
     def item(self, appid, hash_name):
         """Lowest asking price in cents for any market item, or None when nobody sells it."""
         return self.item_stats(appid, hash_name)["lowest"]
@@ -509,26 +514,59 @@ def card_set(session, appid):
     return parse_set_page(page)
 
 
-def parse_listing_page(page):
-    """[(listingid, buyer price)] for sale on a market item's page, cheapest first, leaving out
-    your own (Steam's page carries its listings as JSON in a valve-ssr-data script)."""
+def _ssr_queries(page):
+    """The data queries a market item's page was rendered from (Steam's page carries them as JSON in
+    a valve-ssr-data script): [(query key, data)]."""
     m = re.search(r'<script[^>]*id="valve-ssr-data"[^>]*>(.*?)</script>', page, re.S)
     if not m:
         raise RuntimeError("Steam's market page didn't have its listings in it")
     queries = json.loads(json.loads(m[1])["renderContext"]["queryData"]).get("queries", [])
+    return [(q.get("queryKey") or [""], (q.get("state") or {}).get("data")) for q in queries]
+
+
+def _listings(queries):
+    """Every listing on the page (Steam's own JSON for each), cheapest first not guaranteed."""
     out = []
-    for q in queries:
-        data = (q.get("state") or {}).get("data")
-        if (q.get("queryKey") or [""])[0] != "market_item_search" or not isinstance(data, dict):
-            continue
-        for p in data.get("pages", []):
-            out += [(str(l["listingid"]), int(l["unPrice"]) + int(l["unFee"])) for l in p.get("listings", [])
-                    if not l.get("bMine") and l.get("eCurrency") == 1]
+    for key, data in queries:
+        if key[0] == "market_item_search" and isinstance(data, dict):
+            for p in data.get("pages", []):
+                out += p.get("listings", [])
+    return out
+
+
+def parse_listing_page(page):
+    """[(listingid, buyer price)] for sale on a market item's page, cheapest first, leaving out
+    your own."""
+    out = [(str(l["listingid"]), int(l["unPrice"]) + int(l["unFee"])) for l in _listings(_ssr_queries(page))
+           if not l.get("bMine") and l.get("eCurrency") == 1]
     return sorted(out, key=lambda x: x[1])
 
 
-def cheapest_listing(session, prices, hash_name, appid=753):
-    """What the cheapest listing someone else has up costs a buyer (cents), or None."""
+def parse_order_book(page):
+    """{"sell": [[buyer price, how many are listed at it], ...] cheapest first, without your own
+    listings; "listed": how many in all; "wallet": your Steam wallet in cents (None if it isn't in
+    dollars)} from a market item's page. The page carries the whole order book, not just the
+    listings it shows."""
+    queries = _ssr_queries(page)
+    book = next((d for k, d in queries if k[0] == "market" and len(k) > 1 and k[1] == "orderbook" and isinstance(d, dict)), None)
+    if book is None:
+        raise RuntimeError("Steam's market page didn't have its order book in it")
+    sell = {}
+    if book.get("eCurrency") == 1:
+        flat = book.get("rgCompactSellOrders") or []
+        for price, count in zip(flat[::2], flat[1::2]):
+            sell[int(price)] = sell.get(int(price), 0) + int(count)
+    for l in _listings(queries):  # your own listings are in the book too, and you can't buy them
+        price = int(l["unPrice"]) + int(l["unFee"])
+        if l.get("bMine") and sell.get(price):
+            sell[price] -= 1
+    wallet = next((d for k, d in queries if k[0] == "CurrentUserWalletDetails" and isinstance(d, dict)), None)
+    return {"sell": [[p, n] for p, n in sorted(sell.items()) if n > 0], "listed": sum(sell.values()),
+            "wallet": int(wallet["balance"]) if wallet and wallet.get("currency_code") == 1 and wallet.get("has_wallet") else None}
+
+
+def market_page(session, prices, hash_name, appid=753):
+    """A market item's page, paced with the other market lookups."""
     url = f"{COMMUNITY}/market/listings/{appid}/{urllib.parse.quote(hash_name)}"
 
     def fetch():
@@ -543,9 +581,17 @@ def cheapest_listing(session, prices, hash_name, appid=753):
             raise HttpError(status, page[:300], url)
         return page
     with prices.lock:
-        page = _patient(fetch)
-    found = parse_listing_page(page)
+        return _patient(fetch)
+
+
+def cheapest_listing(session, prices, hash_name, appid=753):
+    """What the cheapest listing someone else has up costs a buyer (cents), or None."""
+    found = parse_listing_page(market_page(session, prices, hash_name, appid))
     return found[0][1] if found else None
+
+
+def order_book(session, prices, hash_name, appid=753):
+    return parse_order_book(market_page(session, prices, hash_name, appid))
 
 
 def create_buy_order(session, hash_name, price_each, quantity=1, appid=753, confirmation="0"):
@@ -629,6 +675,28 @@ def cheapest_cards(prices, pages):
         if not d.get("results"):
             break
     return out
+
+
+def search_card_games(prices, text, pages=2):
+    """Games with trading cards whose name matches `text`, by the market's search (it matches the
+    game as well as the card names): [{"appid", "game", "cheapest"}] in the market's order."""
+    games = {}
+    for page in range(pages):
+        q = urllib.parse.urlencode({"appid": 753, "norender": 1, "start": page * 10, "count": 10, "query": text,
+                                    "category_753_item_class[]": "tag_item_class_2",
+                                    "category_753_cardborder[]": "tag_cardborder_0"})
+        with prices.lock:
+            d = prices._ask(f"{COMMUNITY}/market/search/render/?{q}")
+        for it in d.get("results") or []:
+            m = re.match(r"(\d+)-", it["hash_name"])
+            if not m:
+                continue
+            game = (it.get("asset_description") or {}).get("type", "").removesuffix(" Trading Card")
+            g = games.setdefault(int(m[1]), {"appid": int(m[1]), "game": game, "cheapest": it["sell_price"]})
+            g["cheapest"] = min(g["cheapest"], it["sell_price"])
+        if d.get("total_count", 0) <= (page + 1) * 10:
+            break
+    return list(games.values())
 
 
 # --- booster packs you have -----------------------------------------------------------------------
