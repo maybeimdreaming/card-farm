@@ -173,7 +173,7 @@ class Prices:
     def __init__(self, path):
         self.path = path
         self.lock = threading.RLock()
-        self._last = 0.0
+        self._last = self._last_page = 0.0
         self.session = None  # the farm's sign-in, set by the farm
         try:
             self.cache = json.load(open(path))
@@ -565,23 +565,28 @@ def parse_order_book(page):
             "wallet": int(wallet["balance"]) if wallet and wallet.get("currency_code") == 1 and wallet.get("has_wallet") else None}
 
 
-def market_page(session, prices, hash_name, appid=753):
-    """A market item's page, paced with the other market lookups."""
+PAGE_GAP = 6  # seconds between market item pages, a little gentler than other market lookups
+
+
+def market_page(session, prices, hash_name, appid=753, tries=6):
+    """A market item's page, paced with the other market lookups and further apart from each other."""
     url = f"{COMMUNITY}/market/listings/{appid}/{urllib.parse.quote(hash_name)}"
 
     def fetch():
-        time.sleep(max(0.0, prices._last + prices.GAP - time.time()))
+        time.sleep(max(0.0, prices._last + prices.GAP - time.time(), prices._last_page + PAGE_GAP - time.time()))
         try:
-            status, page = request(url, cookies=session.cookies())
+            # these pages answer "too many requests" to anything calling itself Firefox without
+            # sending everything else Firefox sends; curl as itself gets the page
+            status, page = request(url, cookies=session.cookies(), ua=None)
         finally:
-            prices._last = time.time()
+            prices._last = prices._last_page = time.time()
         if status == 400:  # the market page turns some requests away for a moment
             raise HttpError(502, page[:300], url)
         if status != 200:
             raise HttpError(status, page[:300], url)
         return page
     with prices.lock:
-        return _patient(fetch)
+        return _patient(fetch, tries=tries)
 
 
 def cheapest_listing(session, prices, hash_name, appid=753):
@@ -590,8 +595,8 @@ def cheapest_listing(session, prices, hash_name, appid=753):
     return found[0][1] if found else None
 
 
-def order_book(session, prices, hash_name, appid=753):
-    return parse_order_book(market_page(session, prices, hash_name, appid))
+def order_book(session, prices, hash_name, appid=753, tries=6):
+    return parse_order_book(market_page(session, prices, hash_name, appid, tries))
 
 
 def create_buy_order(session, hash_name, price_each, quantity=1, appid=753, confirmation="0"):

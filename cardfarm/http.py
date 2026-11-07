@@ -65,12 +65,12 @@ def _quoted(text):
     return '"' + str(text).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def request(url, data=None, cookies=None, headers=None, timeout=30):
+def request(url, data=None, cookies=None, headers=None, timeout=30, ua=UA):
     """Returns (status, body text). data (a dict) makes it a form POST.
 
     Cookies, headers and the form go to curl as a config on stdin, never on its command line,
     which any program on the PC can read. While Steam has asked that site to slow down, this
-    answers 429 itself without asking."""
+    answers 429 itself without asking. ua=None sends curl's own User-Agent (see steam.market_page)."""
     if paused_until(url):
         return 429, ""
     config = [f"url = {_quoted(url)}"]
@@ -81,7 +81,7 @@ def request(url, data=None, cookies=None, headers=None, timeout=30):
     if data is not None:
         config.append(f"data-binary = {_quoted(urllib.parse.urlencode(data))}")
     # -c: keep cookies Steam sets on the way (the inventory page redirects through a cookie check)
-    cmd = ["curl", "-s", "-L", "--compressed", "-c", os.devnull, "--max-time", str(timeout), "-A", UA, "-w", "\n%{http_code}", "-K", "-"]
+    cmd = ["curl", "-s", "-L", "--compressed", "-c", os.devnull, "--max-time", str(timeout), *(["-A", ua] if ua else []), "-w", "\n%{http_code}", "-K", "-"]
     out = subprocess.run(cmd, input="\n".join(config).encode() + b"\n",
                          capture_output=True, timeout=timeout + 10, **QUIET).stdout.decode("utf-8", "replace")
     body, _, status = out.rpartition("\n")

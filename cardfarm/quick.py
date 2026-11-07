@@ -5,9 +5,11 @@ level is what buying those exact listings comes to. Buying and crafting only hap
 presses the button, through the farm's saved queue."""
 import time
 
-from . import steam
+from . import http, steam
 
 TOP = 5  # a game's normal badge goes from level 1 to 5; each level takes one full set of its cards
+BOOK_TTL = 15 * 60  # a card's listings, read for pricing, are reused this long (a retry goes on where it stopped)
+WAIT_AT_MOST = 40 * 60  # pricing waits out Steam's "slow down" pauses this long in all before giving up
 
 
 def quick_state():
@@ -58,6 +60,12 @@ class QuickBadge:
 
     def _quick(self):
         return self.state.setdefault("quick", quick_state())
+
+    def _books(self):
+        """Order books read lately, by card (kept in memory only)."""
+        if not hasattr(self, "_book_cache"):
+            self._book_cache = {}
+        return self._book_cache
 
     # --- your badges ----------------------------------------------------------------------------
     def check_badges(self):
@@ -144,10 +152,14 @@ class QuickBadge:
             for c in steam.cards_in_inventory(self.session):
                 if c["appid"] == appid and not c["foil"] and c["assetid"] not in pending:
                     held[c["hash"]] = held.get(c["hash"], 0) + 1
-            cards, wallet = [], None
+            cards, wallet, waited = [], None, 0
             for i, h in enumerate(hashes):
                 self.progress["badge"] = f"{game}: listings for card {i + 1} of {len(hashes)}"
-                book = steam.order_book(self.session, self.prices, h)
+                book = self._books().get(h)
+                if book and time.time() - book["at"] < BOOK_TTL:
+                    book = book["v"]
+                else:
+                    book, waited = self._read_book(game, h, i, len(hashes), waited)
                 wallet = book["wallet"] if book["wallet"] is not None else wallet
                 cards.append({"hash": h, "name": h.split("-", 1)[1].removesuffix(" (Trading Card)"),
                               "have": held.get(h, 0), "sell": book["sell"], "listed": book["listed"]})
@@ -165,6 +177,24 @@ class QuickBadge:
             self.log(f"Couldn't price the {game} badge: {e}", "warn")
         finally:
             self.progress.pop("badge", None)
+
+    def _read_book(self, game, hash_name, i, of, waited):
+        """One card's order book; when Steam asks to slow down, wait the pause out (saying so on the
+        page) and ask again, up to WAIT_AT_MOST in all. Returns (book, time waited so far)."""
+        while True:
+            try:
+                book = steam.order_book(self.session, self.prices, hash_name, tries=1)
+                self._books()[hash_name] = {"at": time.time(), "v": book}
+                return book, waited
+            except steam.HttpError as e:
+                until = http.paused_until(e.url or f"{steam.COMMUNITY}/") or time.time() + 60
+                if e.status != 429 or waited + (until - time.time()) > WAIT_AT_MOST:
+                    raise
+                self.progress["badge"] = (f"{game}: {i} of {of} cards read; Steam asked to slow down, "
+                                          f"going on at {time.strftime('%H:%M', time.localtime(until))}")
+                pause = max(5.0, until - time.time() + 5)
+                time.sleep(pause)
+                waited += pause
 
     def quick_plans(self):
         """For the page: the picked game and a plan for each level it could be taken to."""

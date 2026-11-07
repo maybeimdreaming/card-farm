@@ -1025,7 +1025,7 @@ def quick_world(world, monkeypatch, wallet=1000):
     monkeypatch.setattr(quick_mod.time, "sleep", lambda x: None)
     monkeypatch.setattr(steam, "buy_order_status", lambda s, o: {"quantity": "9", "quantity_remaining": "0"})
     books = {"7-A": [[3, 5], [4, 5]], "7-B": [[5, 1], [9, 9]]}
-    monkeypatch.setattr(steam, "order_book", lambda s, p, h: {"sell": books[h], "listed": 10, "wallet": wallet})
+    monkeypatch.setattr(steam, "order_book", lambda s, p, h, tries=6: {"sell": books[h], "listed": 10, "wallet": wallet})
     monkeypatch.setattr(steam, "card_set", lambda s, a: {"level": 1, "cards": [{"name": "A", "owned": 0}, {"name": "B", "owned": 0}]})
     f = world["make"]()
     f.prices.game_cards = lambda appid: {"7-A": 3, "7-B": 5, "7-A (Foil)": 40}
@@ -1053,3 +1053,22 @@ def test_quick_badge_wont_spend_past_the_wallet(world, monkeypatch):
     with pytest.raises(ValueError, match="wallet"):
         f.quick_badge(7, 5)
     assert not f.state["queue"] and not f.finishing(7)
+
+
+def test_pricing_waits_out_a_slow_down_and_goes_on(world, monkeypatch):
+    f, log = quick_world(world, monkeypatch)
+    asked, slept = [], []
+    books = {"7-A": [[3, 5], [4, 5]], "7-B": [[5, 1], [9, 9]]}
+
+    def book(s, p, h, tries=6):
+        asked.append(h)
+        if len(asked) == 2:                      # the second card is turned away once
+            raise steam.HttpError(429, "", "https://steamcommunity.com/market/listings/753/7-B")
+        return {"sell": books[h], "listed": 10, "wallet": 1000}
+    monkeypatch.setattr(steam, "order_book", book)
+    monkeypatch.setattr(quick_mod.time, "sleep", slept.append)
+    monkeypatch.setattr(quick_mod.http, "paused_until", lambda url: time.time() + 300)
+    f._price_badge(7)
+    assert asked == ["7-A", "7-B", "7-B"] and 300 <= slept[0] <= 306 and f.quick_plans()["plans"]
+    f._price_badge(7)                            # priced again within 15 min: no new lookups
+    assert len(asked) == 3
