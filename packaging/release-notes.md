@@ -1,6 +1,9 @@
 Card Farmer's Market farms your Steam trading card drops, then sells each card or turns it into gems by rules you set. The Items tab can also list skins, cases and other marketable items, only when you say so.
 
 **New in 0.4:**
+- **Quick badge:** pick any game with trading cards (your started badges, ones not crafted yet, the market's cheapest sets, or a search) and see exactly what it costs to take its badge to level 5: every card's listings with how many are up at each price, and the cards you already have counted. One button buys those cards and crafts each level. If some sell first it buys the next ones, never more than 10% (at least 5¢) over the quote, and never more than your Steam wallet holds.
+- **One Badges tab** for everything that crafts badges: Quick badge, finishing sets you hold most of (moved from the Cards tab), and reaching a Steam level (the old Level up tab). Activity now shows under every tab.
+- **Buying cards works again:** Steam's market item pages had started refusing the app's requests, which stopped "Buy & craft" and Level up's "Now" buying.
 - **A garden:** a new look, with the tabs on a strip of grass over rocky ground, and a flower in the grass for every card you farm (foil cards grow a shimmering one). Themes: Light, Dark, Pink, or Auto to follow your system.
 - Friendlier wording throughout, shorter explanations, and "Activity" instead of "Tape".
 - Thanks to **hardwarebob** for the ideas behind the next three changes and the farm history (pull request #1).
@@ -15,8 +18,8 @@ Card Farmer's Market farms your Steam trading card drops, then sells each card o
 - **Skipping:** a game you skip stays skipped until you unskip it, **Unskip all** brings every game back, and free-to-play games like CS2 (whose drops come from in-game purchases, while you play) are skipped unless you choose **Try**.
 - **Market tab:** your listings next to today's prices, with Reprice (cancel and relist) and Cancel; a 30-day earnings chart, your sales by day and by game, and an optional notice when something sells.
 - **Gems tab:** pack gems into sacks and sell them; booster packs whose market price beats their gem cost, made and listed in one click; booster packs you already have, sold or opened, whichever is worth more.
-- **Level up tab:** pick a level and a budget, and it finds the cheapest badge crafts and does them, buying now or with buy orders under the market price.
-- **Cards tab:** card sets you hold most of: "Buy & craft" buys the missing cards (within your limit, checked before anything is bought) and crafts the badge; the set's cards are kept, not sold, until it's done.
+- **Reach a Steam level:** pick a level and a budget, and it finds the cheapest badge crafts and does them, buying now or with buy orders under the market price.
+- **Finish sets:** card sets you hold most of: "Buy & craft" buys the missing cards (within your limit, checked before anything is bought) and crafts the badge; the set's cards are kept, not sold, until it's done.
 - **Sales checks:** cards, items and booster packs are priced at what really sells, not at old asking prices nobody pays.
 - **Easier on Steam's market:** prices are looked up while signed in, and when Steam says "too many requests", lookups pause for a while instead of failing over and over.
 - **One Mac download for every Mac:** `Card-Farm-macOS.zip` runs on Apple silicon and Intel.
