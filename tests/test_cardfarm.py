@@ -1024,6 +1024,7 @@ def quick_world(world, monkeypatch, wallet=1000):
     log = buying_world(monkeypatch)
     monkeypatch.setattr(quick_mod.time, "sleep", lambda x: None)
     monkeypatch.setattr(steam, "buy_order_status", lambda s, o: {"quantity": "9", "quantity_remaining": "0"})
+    monkeypatch.setattr(steam, "buy_orders", lambda s: {})  # every order closed once filled
     books = {"7-A": [[3, 5], [4, 5]], "7-B": [[5, 1], [9, 9]]}
     monkeypatch.setattr(steam, "order_book", lambda s, p, h, tries=6: {"sell": books[h], "listed": 10, "wallet": wallet})
     monkeypatch.setattr(steam, "card_set", lambda s, a: {"level": 1, "cards": [{"name": "A", "owned": 0}, {"name": "B", "owned": 0}]})
@@ -1072,3 +1073,19 @@ def test_pricing_waits_out_a_slow_down_and_goes_on(world, monkeypatch):
     assert asked == ["7-A", "7-B", "7-B"] and 300 <= slept[0] <= 306 and f.quick_plans()["plans"]
     f._price_badge(7)                            # priced again within 15 min: no new lookups
     assert len(asked) == 3
+
+
+def test_quick_badge_waits_while_steam_still_holds_the_last_order(world, monkeypatch):
+    f, log = quick_world(world, monkeypatch)
+    placed = []
+
+    def order(s, h, p, q=1, **kw):              # Steam still counts the last order for a moment
+        placed.append((h, p, q))
+        if len(placed) == 3:
+            raise RuntimeError("You already have an active buy order for this item. You will need to either cancel that order, or wait for it to be fulfilled before you can place a new order.")
+        return {"orderid": f"o{len(placed)}"}
+    monkeypatch.setattr(steam, "create_buy_order", order)
+    f._price_badge(7)
+    f.quick_badge(7, 5)
+    f._do_quick(f.state["queue"][0]["entry"])
+    assert placed[2] == placed[3] and log.count(("craft", 7)) == 4 and not f.finishing(7)
